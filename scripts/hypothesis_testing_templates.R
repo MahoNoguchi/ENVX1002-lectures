@@ -14,6 +14,7 @@
 
 library(ggplot2)   # for all visualisations (ggplot2)
 library(patchwork) # for combining ggplot2 panels side-by-side
+# library(car)    # for leveneTest() — loaded in Section 2; install if needed
 
 
 # =============================================================================
@@ -461,7 +462,7 @@ result_gof <- chisq.test(
 result_gof          # chi-squared, df = k-1, p-value
 result_gof$observed # observed frequencies
 result_gof$expected # expected frequencies (verify assumption)
-result_gof$residuals# Pearson residuals — which cells deviate most?
+result_gof$residuals  # Pearson residuals — which cells deviate most?
 
 # --- P: P-value --------------------------------------------------------------
 result_gof$p.value
