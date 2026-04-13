@@ -68,6 +68,37 @@ shapiro.test(x)
 # If p > 0.05 → no strong evidence against normality → proceed with t-test.
 # If p < 0.05 → consider a log/sqrt/reciprocal transformation, then recheck.
 
+# Outlier detection and removal (apply if histogram / Q-Q plot suggests outliers)
+# Method: IQR rule — values below Q1 − 1.5×IQR or above Q3 + 1.5×IQR are flagged.
+
+q_x   <- quantile(x, probs = c(0.25, 0.75))
+iqr_x <- IQR(x)
+lower_x <- q_x[1] - 1.5 * iqr_x
+upper_x <- q_x[2] + 1.5 * iqr_x
+
+# Identify and inspect the outlying values:
+x[x < lower_x | x > upper_x]          # print suspected outliers
+
+# Remove outliers — creates a cleaned version of the vector:
+x_clean <- x[x >= lower_x & x <= upper_x]
+
+# Recheck normality on the cleaned data before proceeding:
+shapiro.test(x_clean)
+
+# Optional: visualise the cleaned data to confirm outliers are gone.
+df1_clean <- data.frame(x = x_clean)
+p_hist_clean <- ggplot(df1_clean, aes(x)) +
+  geom_histogram(fill = "grey80", colour = "white", bins = 15) +
+  labs(title = "Histogram (outliers removed)", x = "Measurement", y = "Count") +
+  theme_minimal()
+p_qq_clean <- ggplot(df1_clean, aes(sample = x)) +
+  stat_qq() + stat_qq_line(colour = "red") +
+  labs(title = "Q-Q plot (outliers removed)", x = "Theoretical", y = "Sample") +
+  theme_minimal()
+p_hist_clean + p_qq_clean
+
+# Use x_clean in place of x for all subsequent steps (skewness, t-test, etc.).
+
 # Skewness and kurtosis (e1071)
 # Skewness: values between -0.5 and 0.5 are considered acceptably symmetrical.
 #   > 0.5 or < -0.5 → moderate skew; > 1 or < -1 → high skew → consider transform.
@@ -195,6 +226,40 @@ ggplot(df2, aes(x = group, y = response, fill = group)) +
 shapiro.test(df2$response[df2$group == "treatment"])
 shapiro.test(df2$response[df2$group == "control"])
 
+# Outlier detection and removal per group (apply if histogram / Q-Q plot suggests outliers)
+# The IQR rule is applied separately within each group so that group-specific
+# spread is respected.
+
+is_outlier_iqr <- function(y) {
+  q  <- quantile(y, probs = c(0.25, 0.75))
+  iq <- IQR(y)
+  y < (q[1] - 1.5 * iq) | y > (q[2] + 1.5 * iq)
+}
+
+# Flag outlier rows (TRUE = outlier):
+outlier_flags <- ave(df2$response, df2$group,
+                     FUN = function(y) is_outlier_iqr(y)) == 1
+
+# Inspect the suspected outlying rows:
+df2[outlier_flags, ]
+
+# Remove outliers — creates a cleaned version of the data frame:
+df2_clean <- df2[!outlier_flags, ]
+
+# Recheck normality per group on the cleaned data:
+shapiro.test(df2_clean$response[df2_clean$group == "treatment"])
+shapiro.test(df2_clean$response[df2_clean$group == "control"])
+
+# Optional: visualise the cleaned data.
+ggplot(df2_clean, aes(x = response, fill = group)) +
+  geom_histogram(binwidth = 5, colour = "black", alpha = 0.5) +
+  facet_wrap(~group) +
+  labs(title = "Histograms by group (outliers removed)", x = "Response", y = "Count") +
+  theme_classic()
+
+# Use df2_clean in place of df2 for all subsequent steps
+# (skewness, Levene's test, t-test, etc.).
+
 # Skewness and kurtosis per group (e1071)
 # Confirm symmetry within each group before relying on the t-test.
 tapply(df2$response, df2$group, skewness)
@@ -313,6 +378,41 @@ p_diff_qq <- ggplot(df3, aes(sample = diff)) +
 p_diff_hist + p_diff_qq
 
 shapiro.test(df3$diff)   # formal normality test on the differences
+
+# Outlier detection and removal on the pairwise differences
+# (apply if histogram / Q-Q plot of differences suggests outliers)
+# Because before/after values are paired, removing one difference means removing
+# the ENTIRE row (both the before and after values for that subject).
+
+q_diff   <- quantile(df3$diff, probs = c(0.25, 0.75))
+iqr_diff <- IQR(df3$diff)
+lower_diff <- q_diff[1] - 1.5 * iqr_diff
+upper_diff <- q_diff[2] + 1.5 * iqr_diff
+
+# Identify and inspect the outlying pairs:
+df3[df3$diff < lower_diff | df3$diff > upper_diff, ]
+
+# Remove the outlying pairs — creates a cleaned version of the data frame:
+df3_clean <- df3[df3$diff >= lower_diff & df3$diff <= upper_diff, ]
+
+# Recheck normality of the differences on the cleaned data:
+shapiro.test(df3_clean$diff)
+
+# Optional: visualise the cleaned differences.
+p_diff_hist_clean <- ggplot(df3_clean, aes(x = diff)) +
+  geom_histogram(fill = "steelblue", colour = "white", bins = 10) +
+  labs(title = "Histogram of differences (outliers removed)",
+       x = "After − Before", y = "Count") +
+  theme_minimal()
+p_diff_qq_clean <- ggplot(df3_clean, aes(sample = diff)) +
+  stat_qq() + stat_qq_line(colour = "red") +
+  labs(title = "Q-Q plot of differences (outliers removed)",
+       x = "Theoretical", y = "Sample") +
+  theme_minimal()
+p_diff_hist_clean + p_diff_qq_clean
+
+# Use df3_clean in place of df3 for all subsequent steps
+# (skewness, transformation, t-test, etc.).
 
 # Skewness and kurtosis of the differences (e1071)
 # For the paired t-test, normality of the *differences* is what matters.
