@@ -77,6 +77,45 @@ shapiro.test(x)
 skewness(x)
 kurtosis(x)
 
+# Transformation and back-transformation (apply if normality is violated)
+# Common options: log (positive, right-skewed), sqrt (counts / mild skew),
+#                 1/x (strong right skew — all values must be > 0).
+# Apply the SAME transformation to the hypothesised mean (mu0).
+
+x_log   <- log(x)          # natural log  — most common for environmental data
+x_sqrt  <- sqrt(x)         # square root
+x_recip <- 1 / x           # reciprocal
+
+# Recheck normality on the transformed variable (shown for log):
+shapiro.test(x_log)
+skewness(x_log)
+kurtosis(x_log)
+
+# Run the one-sample t-test on the log scale:
+mu0_log <- log(mu0)                # transform mu0 to the same scale
+result_1samp_log <- t.test(
+  x_log,
+  mu          = mu0_log,
+  alternative = "two.sided",
+  conf.level  = 0.95
+)
+result_1samp_log
+
+# Back-transform to the original scale:
+# exp() reverses log(); the CI becomes a CI for the geometric mean.
+exp(result_1samp_log$estimate)   # geometric mean of x
+exp(result_1samp_log$conf.int)   # 95% CI on the original scale
+# Interpret: "The geometric mean [variable] was [not] significantly different
+#             from [mu0] (t_[df] = [t], p = [p]; 95% CI: [lower]–[upper])."
+
+# For sqrt: back-transform by squaring CI limits.
+#   result_sqrt <- t.test(x_sqrt, mu = sqrt(mu0), ...)
+#   result_sqrt$conf.int ^ 2
+
+# For reciprocal: back-transform by 1/CI limits (note: order of limits reverses).
+#   result_recip <- t.test(x_recip, mu = 1/mu0, ...)
+#   1 / rev(result_recip$conf.int)
+
 # --- T: Test statistic -------------------------------------------------------
 # base R — t.test()
 result_1samp <- t.test(
@@ -161,6 +200,39 @@ shapiro.test(df2$response[df2$group == "control"])
 tapply(df2$response, df2$group, skewness)
 tapply(df2$response, df2$group, kurtosis)
 # Interpret as for Section 1: |skewness| < 0.5 and kurtosis near 0 → normal-like.
+
+# Transformation and back-transformation (apply if normality is violated)
+# Apply the SAME transformation to BOTH groups; choose based on skewness/kurtosis.
+
+df2$response_log  <- log(df2$response)   # natural log  — positive right-skewed data
+df2$response_sqrt <- sqrt(df2$response)  # square root  — count data / mild skew
+
+# Recheck normality on the transformed variable (shown for log):
+tapply(df2$response_log, df2$group, shapiro.test)
+tapply(df2$response_log, df2$group, skewness)
+tapply(df2$response_log, df2$group, kurtosis)
+
+# Run Welch's t-test on the log scale:
+result_welch_log <- t.test(
+  response_log ~ group,
+  data        = df2,
+  var.equal   = FALSE,
+  alternative = "two.sided",
+  conf.level  = 0.95
+)
+result_welch_log
+
+# Back-transform to the original scale:
+# On the log scale, the difference of means is a log-ratio; exp() gives a ratio
+# of geometric means on the original scale.
+exp(result_welch_log$estimate)   # geometric mean per group
+exp(result_welch_log$conf.int)   # 95% CI for the ratio of geometric means
+# Interpret: "The geometric mean [response] in [treatment] was [X]-fold the
+#             geometric mean in [control] (95% CI: [lower]–[upper], p = [p])."
+
+# For sqrt back-transformation: square the CI limits.
+#   result_sqrt2 <- t.test(response_sqrt ~ group, data = df2, ...)
+#   result_sqrt2$conf.int ^ 2
 
 # Levene's test for equal variances (requires the car package)
 # install.packages("car")   # uncomment if not installed
@@ -247,6 +319,43 @@ shapiro.test(df3$diff)   # formal normality test on the differences
 skewness(df3$diff)
 kurtosis(df3$diff)
 # Interpret as for Section 1: |skewness| < 0.5 and kurtosis near 0 → normal-like.
+
+# Transformation and back-transformation (apply if normality of differences is violated)
+#
+# Option A — log-transform the raw before/after values, then re-derive differences.
+#   Useful when before/after values are positive and right-skewed.
+#   log(after) - log(before) = log(after/before) — a log-ratio of measurements.
+
+df3$before_log <- log(df3$before)
+df3$after_log  <- log(df3$after)
+df3$diff_log   <- df3$after_log - df3$before_log   # = log(after / before)
+
+# Recheck normality of the log-scale differences:
+shapiro.test(df3$diff_log)
+skewness(df3$diff_log)
+kurtosis(df3$diff_log)
+
+# Run the paired t-test on the log-scale differences:
+result_paired_log <- t.test(
+  df3$diff_log,
+  mu          = 0,
+  alternative = "two.sided",
+  conf.level  = 0.95
+)
+result_paired_log
+
+# Back-transform to the original scale:
+# exp(diff_log) = after/before, so exp() converts log-differences to ratios.
+exp(result_paired_log$estimate)   # geometric mean ratio  (after / before)
+exp(result_paired_log$conf.int)   # 95% CI for the ratio on the original scale
+# Interpret: "After [treatment], [variable] was on average [X]-fold its
+#             pre-treatment value (95% CI: [lower]–[upper], p = [p])."
+
+# Option B — signed square root of the raw differences (when only the
+#   differences, not the raw values, are skewed):
+#   df3$diff_sqrt <- sqrt(abs(df3$diff)) * sign(df3$diff)
+#   result_sqrt_p <- t.test(df3$diff_sqrt, mu = 0, ...)
+#   Back-transform: result_sqrt_p$conf.int ^ 2  # preserving the sign is optional
 
 # --- T: Test statistic -------------------------------------------------------
 # Method 1 — one-sample t-test on the differences (base R):
