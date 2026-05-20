@@ -795,7 +795,7 @@ summary(fit_exponential)
 - If this were real data (e.g. population growth), the parameters themselves e.g. rate of change, are useful
 - The parameterised model is:
 
-$$ y = 1.17 \cdot e^{-0.484x} $$
+$$ y = 1.17 \cdot e^{0.484x} $$
 The R-squared value is not reported for nonlinear models as the sum of squares is not partitioned into explained and unexplained components. You can use the **residual standard error** and plots instead to compare between models.
 
 ## A really bad guess?
@@ -825,7 +825,7 @@ If an error pops up, try different starting values - the **rate of change** is m
 ```{r}
 #| echo: true
 library(nlraa)
-fit_exponential_ss <- nls(response ~ SSexpf(predictor, y0, k), data = decay) 
+fit_exponential_ss <- nls(response ~ SSexpf(predictor, y0, k), data = growth) 
 summary(fit_exponential_ss)
 ```
 
@@ -967,7 +967,9 @@ summary(fit_logistic)
 $$ y = \frac{310}{1+e^{\frac{4.93-x}{1.35}}} $$
 
 # How do we know which model is better? (Advanced)
-Note: this is non-examinable content but might be useful for your project.
+Note: this is non-examinable content but shows how we can assess model accuracy beyond r^2^.
+
+You do NOT need to use this for your presentation. 
 
 ## Example: polynomial regression
 
